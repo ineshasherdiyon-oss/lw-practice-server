@@ -1,0 +1,6 @@
+language = "nodejs-22"
+run = "node index.js"
+modules = ["nodejs-20"]
+
+[agent]
+expertMode = true

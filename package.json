@@ -1,17 +1,14 @@
 {
-  "name": "lw-voice-server",
+  "name": "minimal-practice-server",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "axios": "^1.5.0",
-    "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-rate-limit": "^8.2.1",
-    "form-data": "^4.0.0",
     "node-fetch": "^3.3.2",
-    "socket.io": "^4.7.2"
+    "socket.io": "^4.8.1"
   }
 }
