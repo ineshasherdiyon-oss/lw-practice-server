@@ -47,6 +47,11 @@ io.on("connection", (socket) => {
     console.log("client disconnected", socket.id);
   });
 });
+app.get('/recordings', (req, res) => {
+  const files = fs.readdirSync(recordingsDir).filter(f => f.endsWith('.webm'));
+  res.send(`<h2>Recordings</h2><ul>${files.map(f => `<li><a href="/recordings/${f}">${f}</a></li>`).join('')}</ul>`);
+});
+app.use('/recordings', express.static(recordingsDir));
 
 // List recordings endpoint + static serve
 app.get("/recordings", (req, res) => {
