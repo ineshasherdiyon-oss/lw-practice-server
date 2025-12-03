@@ -1,82 +1,48 @@
-// index.js - minimal, robust server for Render
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const fs = require("fs");
-const path = require("path");
+// ---------- Supabase health route ----------
+app.get("/health", async (req, res) => {
+  try {
+    // ensure env vars exist
+    const supabaseUrl = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
+    const serviceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY; // fallback if named differently
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
-
-// IMPORTANT: only one declaration of PORT exists here
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = "0.0.0.0"; // bind to all interfaces so the platform can see the port
-
-// recordings folder
-const recordingsDir = path.join(__dirname, "recordings");
-if (!fs.existsSync(recordingsDir)) fs.mkdirSync(recordingsDir);
-
-// serve static client files from public/ (so / serves public/index.html)
-app.use(express.static(path.join(__dirname, "public")));
-
-// a small health route
-app.get("/ping", (req, res) => res.send("pong"));
-
-// socket.io handlers (append base64 webm chunks to a file)
-io.on("connection", (socket) => {
-  console.log("client connected", socket.id);
-  const outPath = path.join(recordingsDir, `${socket.id}.webm`);
-
-  socket.on("audio-chunk", (base64Data) => {
-    try {
-      const buff = Buffer.from(base64Data, "base64");
-      fs.appendFileSync(outPath, buff);
-      socket.emit("ack", { received: true });
-    } catch (err) {
-      console.error("write error", err);
+    if (!supabaseUrl || !serviceKey) {
+      return res.status(500).json({
+        ok: false,
+        error:
+          "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY) is missing",
+      });
     }
-  });
 
-  socket.on("stop-audio", () => {
-    console.log("stop received for", socket.id);
-    socket.emit("stopped", { file: `${socket.id}.webm` });
-  });
+    // request the first row from the health_check table via Supabase REST
+    const restUrl = `${supabaseUrl}/rest/v1/health_check?select=*&limit=1&order=id.desc`;
+    const r = await fetch(restUrl, {
+      method: "GET",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        Accept: "application/json",
+      },
+    });
 
-  socket.on("disconnect", () => {
-    console.log("client disconnected", socket.id);
-  });
-});
-app.get('/recordings', (req, res) => {
-  const files = fs.readdirSync(recordingsDir).filter(f => f.endsWith('.webm'));
-  res.send(`<h2>Recordings</h2><ul>${files.map(f => `<li><a href="/recordings/${f}">${f}</a></li>`).join('')}</ul>`);
-});
-app.use('/recordings', express.static(recordingsDir));
+    const json = await r.json().catch(() => null);
 
-// List recordings endpoint + static serve
-app.get("/recordings", (req, res) => {
-  const files = fs.existsSync(recordingsDir)
-    ? fs.readdirSync(recordingsDir).filter((f) => f.endsWith(".webm"))
-    : [];
-  res.send(
-    `<h2>Recordings</h2><ul>${files
-      .map((f) => `<li><a href="/recordings/${f}">${f}</a></li>`)
-      .join("")}</ul>`
-  );
-});
-app.use("/recordings", express.static(recordingsDir));
+    if (!r.ok) {
+      return res.status(r.status).json({
+        ok: false,
+        error: json || `Supabase responded with status ${r.status}`,
+      });
+    }
 
-// Start server — BIND to HOST and PORT
-server.listen(PORT, HOST, () => {
-  console.log(`Server running on port ${PORT} (bound to ${HOST})`);
-  console.log(`NODE version: ${process.version}`);
-  console.log(`Serving public at: ${path.join(__dirname, "public")}`);
-});
-
-// good error logging for bind problems
-server.on("error", (err) => {
-  console.error("Server error:", err);
-  if (err.code === "EADDRINUSE") {
-    console.error("Address in use — maybe another process is listening on the port.");
+    return res.json({
+      ok: true,
+      row: (Array.isArray(json) ? json[0] : json) || null,
+    });
+  } catch (err) {
+    console.error("health route error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, error: err.message || String(err) });
   }
 });
+// --------------------------------------------
