@@ -5,7 +5,6 @@ const http = require("http");
 const { Server } = require("socket.io");
 const fs = require("fs");
 const path = require("path");
-const fetch = require("node-fetch");
 
 // ----------------------------------
 // Base server setup
