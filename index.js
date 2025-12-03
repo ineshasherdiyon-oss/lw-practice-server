@@ -66,12 +66,17 @@
   });
 
   // start server
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
+ const PORT = process.env.PORT || 3000;
+const HOST = "0.0.0.0";
 
-  // optional: handle shutdown cleanly
-  process.on("SIGINT", () => {
-    console.log("Shutting down...");
-    server.close(() => process.exit(0));
-  });
+server.listen(PORT, HOST, () => {
+  console.log(`Server running on port ${PORT} (bound to ${HOST})`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error('Port already in use — another process is listening. Choose a different port.');
+  } else {
+    console.error('Server error:', err);
+  }
+});
